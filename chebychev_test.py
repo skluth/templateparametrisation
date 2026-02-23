@@ -354,15 +354,13 @@ def getHistosFromFile( keys, filename ):
     return hists
 
 
-def parametrisationPlots():
-    
+def parametrisationPlots():    
     mlbhistKeys= [ "h_mlb_171.0", "h_mlb_172.0", "h_mlb_172.5", "h_mlb_173.0", "h_mlb_174.0" ]
     mlbhists= getHistosFromFile( mlbhistKeys, "output_signal.root" )
     mtopDependence( mlbhists, n=8, a=40.0, b=148.0, txt="Parametrisation_ttbar"  )
     mtopDependence( mlbhists, n=8, a=40.0, b=160.0, txt="Parametrisation_ttbar"  )
     mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="Parametrisation_ttbar" )
     mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation_ttbar"  )
-    
     mlbhistKeys= [ "tReco_mlb_minavg_171.0", "tReco_mlb_minavg_172.0",
                    "tReco_mlb_minavg_172.5", "tReco_mlb_minavg_173.0", 
                    "tReco_mlb_minavg_174.0" ]
@@ -370,7 +368,6 @@ def parametrisationPlots():
     mtopDependence( mlbhists, n=8, a=40.0, b=160.0, txt="Parametrisation_WWbb"  )
     mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="Parametrisation_WWbb" )
     mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation_WWbb"  )
-    
     return
 
 
@@ -379,7 +376,7 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="Parametrisation", opt="
     # Variable for RooFit
     x= RooRealVar( "mlb", "mlb", a, b )
     mlbhistKeys= mlbhists.keys()
-    key= mlbhistKeys[0]
+    key= list(mlbhistKeys)[0]
     hist= mlbhists[key]
     binw= hist.GetBinWidth( 1 )
     nbins= int((b-a)/binw)
@@ -515,6 +512,8 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="Parametrisation", opt="
     return
 
 
+
+# Try the same with plain ROOT fits
 def parametrisationPlots2():
     
     mlbhistKeys= [ "h_mlb_171.0", "h_mlb_172.0", "h_mlb_172.5", "h_mlb_173.0", "h_mlb_174.0" ]
