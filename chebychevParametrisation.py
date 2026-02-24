@@ -6,12 +6,13 @@
 from ROOT import TFile, TCanvas, TGraphErrors, gStyle, TF1, gInterpreter
 from ROOT import TH1D, TH1F
 
+# Chebychev from C++ class
 gInterpreter.ProcessLine( '#include "ChebychevApproximation.hh"' )
 from ROOT import ChebychevApproximation
 
 # Get histos from file
 def getHistosFromFile( keys, filename ):
-    tf= TFile( filename )
+    tf= TFile.Open( filename )
     hists= dict()
     for key in keys:
         hist= tf.Get( key )
@@ -19,7 +20,8 @@ def getHistosFromFile( keys, filename ):
             hist.SetDirectory( 0 )
             hists[key]= hist
         else:
-            raise RuntimeError( "getHistosFromFile: histogram for "+key+" not found" )        
+            raise RuntimeError( "getHistosFromFile: histogram for "+key+" not found" )
+    tf.Close()
     return hists
 
 # Study parametrisations
@@ -44,15 +46,17 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt=
     fitParErrors= dict()
     for key in mlbhistKeys:
         mlbhist= mlbhists[key]
+        print( "mtopDependence: histo ", key )
         ca= ChebychevApproximation( mlbhist, a, b, n, lnorm )
         cas.append( ca )
         pars= ca.getCoefficients()
         fittf= TF1( key+"_tf1", ca, a, b, n )
+        fittf.Print()
         fittfs[key]= fittf        
         for i in range( n ):            
             fittf.SetParameter( i, pars[i] )
             fittf.SetParName( i, "c"+str(i) )
-        mlbhist.Fit( fittf, "R0V" )
+        mlbhist.Fit( fittf, "0", "", a, b )
         pars= fittf.GetParameters()
         errs= fittf.GetParErrors()
         fitpars= list()
@@ -104,7 +108,7 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt=
 
     pdffilename= txt
     if lnorm:
-        pdffilename+= "_N_"
+        pdffilename+= "_N"
     pdffilename+= "_"+str(n)+"_"+str(a)+"_"+str(b)+".pdf"
     canv1.Print( pdffilename+"(" )
         
@@ -176,16 +180,16 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt=
                 
     return
 
-def parametrisationPlots( opt="n" ):
+def parametrisationPlots( opt="" ):
     
     mlbhistKeys= [ "h_mlb_171.0", "h_mlb_172.0", "h_mlb_172.5", "h_mlb_173.0", "h_mlb_174.0" ]
     mlbhists= getHistosFromFile( mlbhistKeys, "output_signal.root" )
-    mtopDependence( mlbhists, n=8, a=40.0, b=148.0, txt="Parametrisation2_ttbar", opt=opt )
-    mtopDependence( mlbhists, n=8, a=40.0, b=160.0, txt="Parametrisation2_ttbar", opt=opt )
-    mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="Parametrisation2_ttbar", opt=opt )
-    mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2_ttbar", opt=opt )
-    mtopDependence( mlbhists, n=10, a=40.0, b=148.0, txt="Parametrisation2_ttbar", opt=opt )
-    mtopDependence( mlbhists, n=10, a=40.0, b=160.0, txt="Parametrisation2_ttbar", opt=opt )
+    mtopDependence( mlbhists, n=8, a=40.0, b=148.0, txt="ParametrisationRoot_ttbar", opt=opt )
+    mtopDependence( mlbhists, n=8, a=40.0, b=160.0, txt="ParametrisationRoot_ttbar", opt=opt )
+    mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="ParametrisationRoot_ttbar", opt=opt )
+    mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="ParametrisationRoot_ttbar", opt=opt )
+    mtopDependence( mlbhists, n=10, a=40.0, b=148.0, txt="ParametrisationRoot_ttbar", opt=opt )
+    mtopDependence( mlbhists, n=10, a=40.0, b=160.0, txt="ParametrisationRoot_ttbar", opt=opt )
 
     # Histos Broken at the moment
     # mlbhistKeys= [ "tReco_mlb_minavg_171.0", "tReco_mlb_minavg_172.0",
@@ -201,7 +205,7 @@ def parametrisationPlots( opt="n" ):
 
 
 def main():
-    parametrisationPlots(opt="n")
+    parametrisationPlots( opt="n" )
     return
 
 

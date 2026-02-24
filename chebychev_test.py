@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 
 # Parametrise a TH1 histo with Chebychev polynomials, optionally with
 # a fit of coefficients
@@ -14,33 +15,29 @@ from math import fabs, sin
 
 
 # Test Chebyshev classes with wrapper function (object)
-# from ROOT.Math import ChebyshevApprox
-# from ROOT import gInterpreter
 from ROOT import TF1
 def chebyshevApprox( n=8, fopt="R" ):
+    
     # gInterpreter.ProcessLine( '#include "SinFuncObj.hh"' )
     # from ROOT import SinFuncObj
-    # from ROOT import TH1DFuncObj
     # Try sin function
     # sfo= SinFuncObj()
     def sfo( x ):
         return sin( x )
     ca= ChebychevApproximation( sfo, 1.0, 2.0, 3 )
     print( sin(1.5), ca.evaluate(1.5) )
+    
     # Function around TH1D histo
     mlbhistKeys= [ "h_mlb_172.5" ]
     mlbhists= getHistosFromFile( mlbhistKeys, "output_signal.root" )
     mlbhist= mlbhists[ "h_mlb_172.5" ]
-    # mlbfo= TH1DFuncObj( mlbhist )
     def mlbfunc( x ):
         return mlbhist.Interpolate( x )
-    # mlbca= ChebychevApproximation( mlbfo, 40, 160, n )
-    mlbca= ChebychevApproximation( mlbfunc, 40, 160, n )
-    # print mlbfo( 100.0 ), mlbca.evaluate( 100.0 )
+    mlbca= ChebychevApproximation( mlbfunc, 40.0, 160.0, n )
     print( mlbfunc( 100.0 ), mlbca.evaluate( 100.0 ) )
     pars= mlbca.getCoefficients()
     print( mlbca( 100.0, pars ) )
-
+    # Setup TF1 and fit histo
     mlbcatf= TF1( "mlbcatf", mlbca, 40.0, 160.0, n )
     for i in range( n ):
         mlbcatf.SetParameter( i, pars[i] )
@@ -48,13 +45,9 @@ def chebyshevApprox( n=8, fopt="R" ):
         mlbcatf.SetParName( i, parname )
     mlbcatf.Print()
     print( mlbcatf.Eval( 100.0 ) )
-
     mlbhist.Fit( mlbcatf, fopt )
         
     return mlbca
-
-
-
 
 # First 8 polynomials for tests of recursive polynomials
 def T0( x ):
@@ -102,6 +95,7 @@ class ChebychevApproximation:
     def __init__( self, func, a, b, n ):
         self.__a= a
         self.__b= b
+        self.__n= n
         from math import cos
         # Interpolation nodes on [-1,1] and [a,b]
         tnodes= []
@@ -123,8 +117,10 @@ class ChebychevApproximation:
             coeffs.append( coeff )
         coeffs[0]/= 2.0
         self.__coeffs= coeffs
+        print( "ChebychevApproximation: degree "+str(n)+", coefficients" )
+        print( coeffs )
         # Check on nodes
-        print( "ChebychevApproximation: degree "+str(n)+" approximation on nodes" )
+        print( "ChebychevApproximation: degree "+str(n)+", approximation on nodes" )
         for k in range( n ):
             xnode= xnodes[k]
             print( xnode, func( xnode ), self.evaluate( xnode ) )
@@ -135,19 +131,18 @@ class ChebychevApproximation:
 
     def evaluate( self, x ):
         return self.__call__( [ x ], self.__coeffs )
-    # Callable with external parameters for TF1
+    
+    # Callable with external parameters for TF1, we get plain cppyy buffers
+    # as call arguments
     def __call__( self, x, pars ):
-        if len( self.__coeffs ) > len( pars ):
-            raise RuntimeError( "ChebychevApproximation::__call__: arrays don't match" )
         xx= x[0]
         value= 0.0
-        for j in range( len( pars ) ):
+        for j in range( self.__n ):
             value+= pars[j]*chbchvpoly( xTot( xx, self.__a, self.__b ), j )
         return value
 
 
 # Tests with ChebychevApproximation
-
 def chbchv_test( n=2, a=0.0, b=1.0 ):
     
     from math import cos
@@ -307,7 +302,8 @@ def parametriseDataHist( datahist, x, n=9, nip=3, opt="f" ):
 
 
 # Calculate the Chebychev parametrisation of a RooPdf
-# (or anything else with a working getVal())
+# (or anything else with a working getVal()) with a
+# RooChebychev (these work with normalised Chebychev coeficients)
 def parametrisePdf( pdf, var, n=9 ):
 
     # Function for ChebychevApproximation
@@ -339,10 +335,9 @@ def parametrisePdf( pdf, var, n=9 ):
     # The End
     return chbchv
 
-
 # Get histos from file
 def getHistosFromFile( keys, filename ):
-    tf= TFile( filename )
+    tf= TFile.Open( filename )
     hists= dict()
     for key in keys:
         hist= tf.Get( key )
@@ -353,24 +348,25 @@ def getHistosFromFile( keys, filename ):
             raise RuntimeError( "getHistosFromFile: histogram for "+key+" not found" )
     return hists
 
-
+# Parametrise with fit, plots
 def parametrisationPlots():    
     mlbhistKeys= [ "h_mlb_171.0", "h_mlb_172.0", "h_mlb_172.5", "h_mlb_173.0", "h_mlb_174.0" ]
     mlbhists= getHistosFromFile( mlbhistKeys, "output_signal.root" )
-    mtopDependence( mlbhists, n=8, a=40.0, b=148.0, txt="Parametrisation_ttbar"  )
-    mtopDependence( mlbhists, n=8, a=40.0, b=160.0, txt="Parametrisation_ttbar"  )
-    mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="Parametrisation_ttbar" )
-    mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation_ttbar"  )
-    mlbhistKeys= [ "tReco_mlb_minavg_171.0", "tReco_mlb_minavg_172.0",
-                   "tReco_mlb_minavg_172.5", "tReco_mlb_minavg_173.0", 
-                   "tReco_mlb_minavg_174.0" ]
-    mtopDependence( mlbhists, n=8, a=40.0, b=148.0, txt="Parametrisation_WWbb"  )
-    mtopDependence( mlbhists, n=8, a=40.0, b=160.0, txt="Parametrisation_WWbb"  )
-    mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="Parametrisation_WWbb" )
-    mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation_WWbb"  )
+    mtopDependence( mlbhists, n=8, a=40.0, b=148.0, txt="ParametrisationRooFit_ttbar"  )
+    mtopDependence( mlbhists, n=8, a=40.0, b=160.0, txt="ParametrisationRooFit_ttbar"  )
+    mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="ParametrisationRooFit_ttbar" )
+    mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="ParametrisationRoofit_ttbar"  )
+    mtopDependence( mlbhists, n=10, a=40.0, b=148.0, txt="ParametrisationRooFit_ttbar" )
+    mtopDependence( mlbhists, n=10, a=40.0, b=160.0, txt="ParametrisationRoofit_ttbar"  )
+    # mlbhistKeys= [ "tReco_mlb_minavg_171.0", "tReco_mlb_minavg_172.0",
+    #                "tReco_mlb_minavg_172.5", "tReco_mlb_minavg_173.0", 
+    #                "tReco_mlb_minavg_174.0" ]
+    # mlbhists= getHistosFromFile( mlbhistKeys, "output_signal.root" )
+    # mtopDependence( mlbhists, n=8, a=40.0, b=148.0, txt="Parametrisation_WWbb"  )
+    # mtopDependence( mlbhists, n=8, a=40.0, b=160.0, txt="Parametrisation_WWbb"  )
+    # mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="Parametrisation_WWbb" )
+    # mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation_WWbb"  )
     return
-
-
 def mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="Parametrisation", opt="f" ):
 
     # Variable for RooFit
@@ -397,7 +393,7 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="Parametrisation", opt="
         rooCoeffRrvsDict[key]= rooCoeffRrvs
         chbchvPdfs[key]= chbchvPdf
         datahists[key]= datahist
-    print( "mtopDependence: Results for Chebychev coefficients" )
+    print( "mtopDependence: Results for RooChebychev coefficients" )
     for key in sorted( mlbhistKeys ):
         rooCoeffRrvs= rooCoeffRrvsDict[key]
         for rooCoeffRrv in rooCoeffRrvs:            
@@ -435,16 +431,16 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="Parametrisation", opt="
     gStyle.SetOptFit( 1111 )
 
     # Ratio plots
-    canv3= TCanvas( "canv3", "Significance plots", 600, 800 )
-    canv3.Divide( 2, 3 )
-    canv3.SetGrid()
+    canv2= TCanvas( "canv2", "Significance plots", 600, 800 )
+    canv2.Divide( 2, 3 )
+    canv2.SetGrid()
     icanv= 0
     TH1Dchbchvhists= list()
     TH1Ddatahists= list()
     ratioPlots= list()
     for key in mlbhistKeys:
         icanv+= 1
-        pad= canv3.cd( icanv )
+        pad= canv2.cd( icanv )
         pad.SetGrid()
         chbchvPdf= chbchvPdfs[key]
         datahist= datahists[key]
@@ -474,7 +470,7 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="Parametrisation", opt="
         ratioPlot.SetMarkerSize( 0.75 )
         ratioPlot.Fit( "pol0" )
         ratioPlot.Draw( "ap" )
-    canv3.Print( pdffilename, "pdf" )
+    canv2.Print( pdffilename, "pdf" )
 
     # Plots of coefficients vs mtop
     tges= list()
@@ -497,32 +493,32 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="Parametrisation", opt="
             tge.SetPointError( imtopPoint, 0.0, error )
             imtopPoint+= 1
         tges.append( tge )
-    canv2= TCanvas( "canv2", "Coefficients mtop dependence", 800, 800 )
-    canv2.DivideSquare( n-1 )
+    canv3= TCanvas( "canv3", "Coefficients mtop dependence", 800, 800 )
+    canv3.DivideSquare( n-1 )
     for icoeff in range( ncoeffs ):
-        canv2.cd( icoeff+1 )
+        canv3.cd( icoeff+1 )
         tge= tges[icoeff]
         tge.SetMarkerColor( 1 )
         tge.SetMarkerStyle( 20 )
         tge.SetMarkerSize( 0.75 )
         tge.Fit( "pol1" )
         tge.Draw( "ap" )
-    canv2.Print( pdffilename+")", "pdf" )
+    canv3.Print( pdffilename+")", "pdf" )
                 
     return
 
-
-
-# Try the same with plain ROOT fits
+# Parametrisation with plain PyROOT fits
 def parametrisationPlots2():
     
     mlbhistKeys= [ "h_mlb_171.0", "h_mlb_172.0", "h_mlb_172.5", "h_mlb_173.0", "h_mlb_174.0" ]
     global mlbhists
     mlbhists= getHistosFromFile( mlbhistKeys, "output_signal.root" )
-    #mtopDependence2( mlbhists, n=8, a=40.0, b=148.0, txt="Parametrisation2_ttbar"  )
-    #mtopDependence2( mlbhists, n=8, a=40.0, b=160.0, txt="Parametrisation2_ttbar"  )
-    #mtopDependence2( mlbhists, n=9, a=40.0, b=148.0, txt="Parametrisation2_ttbar" )
-    mtopDependence2( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2_ttbar"  )
+    mtopDependence2( mlbhists, n=8, a=40.0, b=148.0, txt="ParametrisationPy_ttbar"  )
+    mtopDependence2( mlbhists, n=8, a=40.0, b=160.0, txt="ParametrisationPy_ttbar"  )
+    mtopDependence2( mlbhists, n=9, a=40.0, b=148.0, txt="ParametrisationPy_ttbar" )
+    mtopDependence2( mlbhists, n=9, a=40.0, b=160.0, txt="ParametrisationPy_ttbar"  )
+    mtopDependence2( mlbhists, n=10, a=40.0, b=148.0, txt="ParametrisationPy_ttbar" )
+    mtopDependence2( mlbhists, n=10, a=40.0, b=160.0, txt="ParametrisationPy_ttbar"  )
     
     # mlbhistKeys= [ "tReco_mlb_minavg_171.0", "tReco_mlb_minavg_172.0",
     #                "tReco_mlb_minavg_172.5", "tReco_mlb_minavg_173.0", 
@@ -534,30 +530,30 @@ def parametrisationPlots2():
     
     return
 
-
+# Function object around histo for ChebychevApproximation
 class HistFunc:
     def __init__( self, hist ):
         self.__hist= hist
     def __call__( self, x ):
         return self.__hist.Interpolate( x )
+# Plain ROOT fit parametrisation
 def parametriseHistogram( hist, a, b, n ):
     histFunc= HistFunc( hist )
     ca= ChebychevApproximation( histFunc, a, b, n )
     pars= ca.getCoefficients()
     histname= hist.GetName()
     fittf= TF1( histname+"_tf1", ca, a, b, n )
-    global fittfs
-    fittfs[histname]= fittf
     for i in range( n ):
         fittf.SetParameter( i, pars[i] )
         parname= "c"+str(i)
         fittf.SetParName( i, parname )
     fittf.Print()
     hist.Fit( fittf, "0", "", a, b )
-    return
+    return fittf
 
 def mtopDependence2( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt="f" ):
 
+    # Prepare welcome printout
     mlbhistKeys= mlbhists.keys()
     key= list(mlbhistKeys)[0]
     hist= mlbhists[key]
@@ -570,18 +566,25 @@ def mtopDependence2( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt
     fittfs= dict()
     for key in sorted( mlbhistKeys ):
         mlbhist= mlbhists[key]
-        parametriseHistogram( mlbhist, a, b, n )
-    print( "mtopDependence2: Results for Chebychev coefficients" )
+        fittf= parametriseHistogram( mlbhist, a, b, n )
+        fittfs[key]= fittf
+    if "v" in opt:
+        print( "mtopDependence2: Results for Chebychev coefficients" )
+    hpars= dict()
+    hparerrs= dict()
     for key in sorted( mlbhistKeys ):
         mlbhist= mlbhists[key]
         fittf= fittfs[key]
         pars= fittf.GetParameters()
         errs= fittf.GetParErrors()
-        for i in range( n ):
-            value= pars[i]
-            error= errs[i]
-            print( "{0:7.4f} {1:7.4f}".format( value, error ), end=" " )
-        print()
+        hpars[key]= pars
+        hparerrs[key]= errs
+        if "v" in opt:
+            for i in range( n ):
+                value= pars[i]
+                error= errs[i]
+                print( "{0:7.4f} {1:7.4f}".format( value, error ), end=" " )
+            print()
         
     # Some globals so plots stay alive
     global canv, tges, ratioPlots
@@ -590,32 +593,27 @@ def mtopDependence2( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt
     gStyle.SetOptFit( 1111 )
 
     # Plots of parametrisations
-    canv= TCanvas( "canv", "Fit plots", 600, 800 )
-    canv.Divide( 2, 3 )
+    canv1= TCanvas( "canv1", "Fit plots", 600, 800 )
+    canv1.Divide( 2, 3 )
     icanv= 0
     for key in sorted( mlbhistKeys ):
         icanv+= 1
-        canv.cd( icanv )
+        canv1.cd( icanv )
         mlbhist= mlbhists[key]
         mlbhist.Draw()
-        # fittf= fittfs[key]
-        # fittf.Draw( "same" )
+        fittf= fittfs[key]
+        fittf.Draw( "same" )
     pdffilename= txt+"_"+str(n)+"_"+str(a)+"_"+str(b)+".pdf"
-    canv.SaveAs( pdffilename )
-    #canv.Print( pdffilename+"(", "pdf" )
+    canv1.Print( pdffilename+"(", "pdf" )
 
-
-    return
-
-        
     # Ratio plots
-    canv3= TCanvas( "canv3", "Significance plots", 600, 800 )
-    canv3.Divide( 2, 3 )
+    canv2= TCanvas( "canv2", "Significance plots", 600, 800 )
+    canv2.Divide( 2, 3 )
     icanv= 0
     ratioPlots= list()
     for key in sorted( mlbhistKeys ):
         icanv+= 1
-        pad= canv3.cd( icanv )
+        pad= canv2.cd( icanv )
         pad.SetGrid()
         mlbhist= mlbhists[key]
         fittf= fittfs[key]
@@ -642,45 +640,44 @@ def mtopDependence2( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt
         ratioPlot.SetMarkerSize( 0.75 )
         ratioPlot.Fit( "pol0" )
         ratioPlot.Draw( "ap" )
-
-    canv.Print( pdffilename+")", "pdf" )
-
-
-    return
-
+    canv2.Print( pdffilename, "pdf" )
     
     # Plots of coefficients vs mtop
     tges= list()
-    ncoeffs= len(rooCoeffRrvs)
+    ncoeffs= n
     for icoeff in range( ncoeffs ):
         tge= TGraphErrors()
         tge.SetName( "tge"+str(icoeff+1) )
-        tge.SetTitle( "Chebychev coeff c"+str(icoeff+1) )
+        tge.SetTitle( "Chebychev coeff c"+str(icoeff) )
         imtopPoint= 0
         for key in sorted( mlbhistKeys ):
             tokens= key.split("_")
             mtop= float( tokens[len(tokens)-1] )
-            rooCoeffRrvs= rooCoeffRrvsDict[key]
-            # No index into RooArgSet, but is sorted
-            rooCoeffRRvList= [ coeff for coeff in rooCoeffRrvs ]
-            rooCoeffRrv= rooCoeffRRvList[icoeff]
-            value= rooCoeffRrv.getVal()
-            error= rooCoeffRrv.getError()
+            value= hpars[key][icoeff]
+            error= hparerrs[key][icoeff]
             tge.SetPoint( imtopPoint, mtop, value )
             tge.SetPointError( imtopPoint, 0.0, error )
             imtopPoint+= 1
         tges.append( tge )
-    canv2= TCanvas( "canv2", "Coefficients mtop dependence", 800, 800 )
-    canv2.DivideSquare( n-1 )
+    canv3= TCanvas( "canv3", "Coefficients mtop dependence", 800, 800 )
+    canv3.DivideSquare( n )
     for icoeff in range( ncoeffs ):
-        canv2.cd( icoeff+1 )
+        canv3.cd( icoeff+1 )
         tge= tges[icoeff]
         tge.SetMarkerColor( 1 )
         tge.SetMarkerStyle( 20 )
         tge.SetMarkerSize( 0.75 )
         tge.Fit( "pol1" )
         tge.Draw( "ap" )
-    canv2.Print( pdffilename+")", "pdf" )
+    canv3.Print( pdffilename+")", "pdf" )
                 
     return
 
+
+
+# Run as main
+def main():
+    parametrisationPlots2()
+    return
+if __name__ == '__main__':
+   main()

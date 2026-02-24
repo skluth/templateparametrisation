@@ -116,10 +116,18 @@ class ChebychevApproximation {
       coeffs[j]= coeff;
     }
     coeffs[0]/= 2.0;
-    if( lnorm ) normaliseCoefficients();
-    // Check on nodes
+
     std::cout << "ChebychevApproximation::initialiseCoefficients: degree " << n
-	      << " approximation on nodes"
+	      << ", coefficients" << std::endl;
+    for( size_t j= 0; j < n; j++ ) {
+      std::cout << " " << coeffs[j];
+    }
+    std::cout << std::endl;
+    
+    if( lnorm ) normaliseCoefficients();
+
+    std::cout << "ChebychevApproximation::initialiseCoefficients: degree " << n
+	      << ", approximation on nodes"
 	      << std::endl;
     for( size_t k= 0; k < n; k++ ) {
       double xnode= xnodes[k];
