@@ -5,9 +5,11 @@
 
 from ROOT import RooRealVar, RooGaussian, RooChebychev, RooArgList, RooFit, RooAddPdf, RooArgSet, RooHistPdf, RooAbsReal, RooLinkedList, RooCmdArg, RooDataHist, RooGenericPdf
 
-from ROOT.RooFit import Label, Format, AutoPrecision
+from ROOT import kBlue, kRed, kGreen
 
-from ROOT import TFile, TCanvas, TGraph, TGraphErrors, gStyle, TH1D, TMath, TRatioPlot
+from ROOT.RooFit import Label, Format, AutoPrecision, LineColor, Name
+
+from ROOT import TFile, TCanvas, TGraph, TGraphErrors, gStyle, TH1D, TMath, TRatioPlot, TLegend
 
 from ROOT import SetOwnership
 
@@ -143,7 +145,7 @@ class ChebychevApproximation:
 
 
 # Tests with ChebychevApproximation
-def chbchv_test( n=2, a=0.0, b=1.0 ):
+def chbchv_test( n=2, a=-5.0, b=5.0 ):
     
     from math import cos
 
@@ -160,7 +162,6 @@ def chbchv_test( n=2, a=0.0, b=1.0 ):
         xnode= (b-a)/2.0*tnode + (a+b)/2.0
         tnodes.append( tnode )
         xnodes.append( xnode )
-
     print( "tnodes", tnodes )
     print( "xnodes", xnodes )
     print( "function", [ fun(xnode) for xnode in xnodes ] )
@@ -177,7 +178,7 @@ def chbchv_test( n=2, a=0.0, b=1.0 ):
         coeffs.append( coeff )
     print( "Chebychev coeffs", coeffs )
 
-    print( "Function at xnodes, approximation" )
+    print( "xnode, function at xnode, approximation" )
     for k in range( n ):
         xnode= xnodes[k]
         tnode= tnodes[k]
@@ -185,7 +186,7 @@ def chbchv_test( n=2, a=0.0, b=1.0 ):
         for j in range( n ):
             p+= coeffs[j]*chbchvpoly( tnode, j )
         p-= 0.5*coeffs[0]
-        print( fun( xnode ), p )
+        print( xnode, fun( xnode ), p )
      
     return
 
@@ -201,11 +202,6 @@ def gauss_test( n=5, nevent=10000 ):
     sigma= RooRealVar( "sigma", "sigma", 5, 0.1, 10.0 )
     gauss= RooGaussian( "gauss", "signal p.d.f.", x, mean, sigma )
 
-    # RooFit workspace
-    xframe= x.frame( RooFit.Title( "Gauss model Chebychev interpolation") )
-    gauss.plotOn( xframe )
-    xframe.Draw()
-
     # Generate a dataset from Gauss
     dataset= gauss.generate( RooArgSet( x ), nevent )
     datahist= dataset.binnedClone() 
@@ -218,6 +214,7 @@ def gauss_test( n=5, nevent=10000 ):
 
     # Setup Chebychev interpolation with python class above
     ca= ChebychevApproximation( func, -10.0, 10.0, n )
+    #ca= ChebychevApproximation( func, -9.0, 9.0, n )
     coeffs= ca.getCoefficients()
     roocoeffs= [ coeff/coeffs[0] for coeff in coeffs ]
     print( roocoeffs )
@@ -227,7 +224,7 @@ def gauss_test( n=5, nevent=10000 ):
     rrvs1= []
     for i in range( 1, len(coeffs) ):
         name= "1c"+str(i)
-        title= "1chbchv coeff "+str(i)
+        title= "chbchv1 coeff "+str(i)
         rrv1= RooRealVar( name, title, roocoeffs[i], -10000.0, 10000.0 )
         rrv1.Print()
         ral1.add( rrv1 )
@@ -239,7 +236,7 @@ def gauss_test( n=5, nevent=10000 ):
     rrvs2= []
     for i in range( 1, len(coeffs) ):
         name= "2c"+str(i)
-        title= "2chbchv coeff "+str(i)
+        title= "chbchv2 coeff "+str(i)
         rrv2= RooRealVar( name, title, roocoeffs[i], -10000.0, 10000.0 )
         rrv2.Print()
         ral2.add( rrv2 )
@@ -252,29 +249,26 @@ def gauss_test( n=5, nevent=10000 ):
     cmdList= RooLinkedList( 1 )
     rca= RooCmdArg( RooFit.PrintLevel(0) )
     cmdList.Add( rca )
-    # gpars= gauss.getParameters( RooArgSet(x) )
-    # gpars.Print()
-    # print "Gauss constant?", gauss.isConstant()
-    # gauss.chi2FitTo( datahist, cmdList )
-
-    # chbpars= chbchv.getParameters( RooArgSet(x) )
-    # chbpars.Print() 
-    # print "Chbchv constant?", chbchv.isConstant()
-    chi2approx= chbchv1.createChi2( datahist ).getVal()
-    
+    chi2approx= chbchv1.createChi2( datahist ).getVal()        
     chbchv2.chi2FitTo( datahist, cmdList )
     chi2fit= chbchv2.createChi2( datahist ).getVal()
     print( "Chi^2 Chebychev approx vs data histogram", chi2approx )
     print( "Chi^2 Chebychev fit vs data histogram", chi2fit )
 
-    # xframe = x.frame(ROOT.RooFit.Title("data generated from composite"))
+    # RooFit plots
+    xframe= x.frame( RooFit.Title( "Gauss model Chebychev interpolation") )
     dataset.plotOn( xframe )
-    # gauss.plotOn( xframe )
-    # chbchv.plotOn( xframe, RooFit.Normalization( 1.0, RooAbsReal.Relative ) )
-    chbchv1.plotOn( xframe )
-    chbchv2.plotOn( xframe )
+    chbchv1.plotOn( xframe, LineColor( kBlue ), Name( "chbchv1" ) )
+    chbchv2.plotOn( xframe, LineColor( kRed ), Name( "chbchv2" ) )
+    gauss.plotOn( xframe, LineColor( kGreen ), Name( "gauss" ) )
     xframe.Draw()
-
+    global legend    
+    legend= TLegend( 0.3, 0.2, 0.6, 0.4 )
+    legend.AddEntry( xframe.findObject( "gauss" ), "Gauss(0,5)", "l" )
+    legend.AddEntry( xframe.findObject( "chbchv1" ), "Chebychev before fit", "l" )
+    legend.AddEntry( xframe.findObject( "chbchv2" ), "Chebychev after fit", "l" )
+    legend.Draw( "same" )
+    
     return
 
 
@@ -534,8 +528,10 @@ def parametrisationPlots2():
 class HistFunc:
     def __init__( self, hist ):
         self.__hist= hist
+    #def __call__( self, x ):
+    #    return self.__hist.Interpolate( x )
     def __call__( self, x ):
-        return self.__hist.Interpolate( x )
+        return self.__hist.GetBinContent( self.__hist.FindBin( x ) )
 # Plain ROOT fit parametrisation
 def parametriseHistogram( hist, a, b, n ):
     histFunc= HistFunc( hist )
@@ -543,13 +539,16 @@ def parametriseHistogram( hist, a, b, n ):
     pars= ca.getCoefficients()
     histname= hist.GetName()
     fittf= TF1( histname+"_tf1", ca, a, b, n )
+    chebtf= TF1( histname+"_cheb_tf1", ca, a, b, n )
     for i in range( n ):
         fittf.SetParameter( i, pars[i] )
+        chebtf.SetParameter( i, pars[i] )
         parname= "c"+str(i)
         fittf.SetParName( i, parname )
+        chebtf.SetParName( i, parname )
     fittf.Print()
     hist.Fit( fittf, "0", "", a, b )
-    return fittf
+    return fittf, chebtf
 
 def mtopDependence2( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt="f" ):
 
@@ -562,12 +561,14 @@ def mtopDependence2( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt
     print( "mtopDependence: bins in range", a, "to", b, "from", key, ":", nbins )
     
     # Do the parametrisation of the hists
-    global fittfs
+    global fittfs, chebtfs
     fittfs= dict()
+    chebtfs= dict()
     for key in sorted( mlbhistKeys ):
         mlbhist= mlbhists[key]
-        fittf= parametriseHistogram( mlbhist, a, b, n )
+        fittf, chebtf= parametriseHistogram( mlbhist, a, b, n )
         fittfs[key]= fittf
+        chebtfs[key]= chebtf
     if "v" in opt:
         print( "mtopDependence2: Results for Chebychev coefficients" )
     hpars= dict()
@@ -591,7 +592,8 @@ def mtopDependence2( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt
 
     # Fit info on plots
     gStyle.SetOptFit( 1111 )
-
+    from ROOT import kBlue
+    
     # Plots of parametrisations
     canv1= TCanvas( "canv1", "Fit plots", 600, 800 )
     canv1.Divide( 2, 3 )
@@ -601,6 +603,9 @@ def mtopDependence2( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt
         canv1.cd( icanv )
         mlbhist= mlbhists[key]
         mlbhist.Draw()
+        chebtf= chebtfs[key]
+        chebtf.SetLineColor( kBlue )
+        chebtf.Draw( "same" )
         fittf= fittfs[key]
         fittf.Draw( "same" )
     pdffilename= txt+"_"+str(n)+"_"+str(a)+"_"+str(b)+".pdf"

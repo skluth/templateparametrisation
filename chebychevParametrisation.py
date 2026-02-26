@@ -25,7 +25,7 @@ def getHistosFromFile( keys, filename ):
     return hists
 
 # Study parametrisations
-def mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt="n" ):
+def mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt="nf" ):
 
     lnorm= False
     if "n" in opt:
@@ -39,8 +39,9 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt=
     print( "mtopDependence: bins in range", a, "to", b, "from", key, ":", nbins )
     
     # Do the parametrisation of the hists
-    global fittfs, cas
+    global fittfs, chebtfs, cas
     fittfs= dict()
+    chebtfs= dict()
     cas= list()
     fitParameters= dict()
     fitParErrors= dict()
@@ -51,14 +52,20 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt=
         cas.append( ca )
         pars= ca.getCoefficients()
         fittf= TF1( key+"_tf1", ca, a, b, n )
+        chebtf= TF1( key+"_cheb_tf1", ca, a, b, n )
         fittf.Print()
         fittfs[key]= fittf        
+        chebtfs[key]= chebtf
         for i in range( n ):            
             fittf.SetParameter( i, pars[i] )
             fittf.SetParName( i, "c"+str(i) )
-        mlbhist.Fit( fittf, "0", "", a, b )
+            chebtf.SetParameter( i, pars[i] )
+            chebtf.SetParName( i, "c"+str(i) )
+        fitresult= mlbhist.Fit( fittf, "0S", "", a, b )
+        cov= fitresult.GetCorrelationMatrix()
+        cov.Print()
         pars= fittf.GetParameters()
-        errs= fittf.GetParErrors()
+        errs= fittf.GetParErrors()            
         fitpars= list()
         fiterrs= list()
         for i in range( n ):
@@ -66,15 +73,17 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt=
             fiterrs.append( errs[i] )
         fitParameters[key]= fitpars
         fitParErrors[key]= fiterrs
-        
-    print( "mtopDependence: Results for Chebychev coefficients" )
+
+    # Results of parametrisation
+    print( "mtopDependence: Results for fitted Chebychev coefficients" )
     for key in mlbhistKeys:
         pars= fitParameters[key]
         errs= fitParErrors[key]
+        print( key, end= ": " )
         for i in range( n ):
             value= pars[i]
             error= errs[i]
-            print( "{0:7.4f} {1:7.4f}".format( value, error ), end=" " )
+            print( "{0:7.3f} +/- {1:7.3f}".format( value, error ), end=" " )
         print()
     if not lnorm:
         print( "Calculated normalised parameters:" )
@@ -93,7 +102,8 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt=
 
     # Fit info on plots
     gStyle.SetOptFit( 1111 )
-
+    from ROOT import kBlue
+    
     # Plots of parametrisations
     canv1= TCanvas( "canv1", "Fit plots", 600, 800 )    
     canv1.Divide( 2, 3 )
@@ -103,6 +113,9 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt=
         canv1.cd( icanv )
         mlbhist= mlbhists[key]
         mlbhist.Draw()
+        chebtf= chebtfs[key]
+        chebtf.SetLineColor( kBlue )
+        chebtf.Draw( "same" )
         fittf= fittfs[key]
         fittf.Draw( "same" )
 
