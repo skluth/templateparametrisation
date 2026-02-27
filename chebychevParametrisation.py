@@ -119,15 +119,14 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt=
         icanv+= 1
         canv1.cd( icanv )
         mlbhist= mlbhists[key]
-        mlbhist.Draw()
+        mlbhist.SetMarkerStyle(20)
+        mlbhist.SetMarkerSize(0.5)
+        mlbhist.Draw("P")
         chebtf= chebtfs[key]
         chebtf.SetLineColor( kBlue )
         chebtf.Draw( "same" )
         fittf= fittfs[key]
         fittf.Draw( "same" )
-        mlbhist.SetMarkerStyle(20)
-        mlbhist.SetMarkerSize(0.5)
-        mlbhist.Draw("PE0 same")
         leg1= TLegend( 0.3, 0.7, 0.5, 0.85 )
         leg1.AddEntry(mlbhist, "Data", "P")
         leg1.AddEntry(chebtf, "Chebyshev (pre)", "L")
