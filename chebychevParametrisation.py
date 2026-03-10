@@ -4,24 +4,31 @@
 # a fit of the coefficients
 
 from ROOT import TFile, TCanvas, TGraphErrors, gStyle, TF1, gInterpreter
-from ROOT import TH1D, TH1F
+from ROOT import TH1D, TH1F, TLegend
+from ROOT import gROOT
+
+gROOT.SetBatch(True) # Enable batch mode (no graphics windows)
 
 # Chebychev from C++ class
 gInterpreter.ProcessLine( '#include "ChebychevApproximation.hh"' )
 from ROOT import ChebychevApproximation
 
 # Get histos from file
-def getHistosFromFile( keys, filename ):
-    tf= TFile.Open( filename )
+def getHistosFromFile( keys, files ):
     hists= dict()
-    for key in keys:
-        hist= tf.Get( key )
-        if hist:
-            hist.SetDirectory( 0 )
-            hists[key]= hist
-        else:
-            raise RuntimeError( "getHistosFromFile: histogram for "+key+" not found" )
-    tf.Close()
+    for f in files:
+        tf= TFile.Open( f )
+        for key in keys:
+            hist= tf.Get( key )
+            if hist:
+                hist.SetDirectory( 0 )
+                if len(files) > 1:
+                    hists[f.split(".")[0]+"_"+key]= hist
+                else:
+                    hists[key]= hist
+            else:
+                raise RuntimeError( "getHistosFromFile: histogram for "+key+" not found" )
+        tf.Close()
     return hists
 
 # Study parametrisations
@@ -112,19 +119,28 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt=
         icanv+= 1
         canv1.cd( icanv )
         mlbhist= mlbhists[key]
-        mlbhist.Draw()
+        mlbhist.SetMarkerStyle(20)
+        mlbhist.SetMarkerSize(0.5)
+        mlbhist.Draw("P")
         chebtf= chebtfs[key]
         chebtf.SetLineColor( kBlue )
         chebtf.Draw( "same" )
         fittf= fittfs[key]
         fittf.Draw( "same" )
-
+        leg1= TLegend( 0.3, 0.7, 0.5, 0.85 )
+        leg1.AddEntry(mlbhist, "Data", "P")
+        leg1.AddEntry(chebtf, "Chebyshev (pre)", "L")
+        leg1.AddEntry(fittf, "Chebyshev (post)", "L")
+        leg1.SetBorderSize(0)
+        leg1.DrawClone("same")
+        #leg1.Clear()
+    del leg1
     pdffilename= txt
     if lnorm:
         pdffilename+= "_N"
     pdffilename+= "_"+str(n)+"_"+str(a)+"_"+str(b)+".pdf"
     canv1.Print( pdffilename+"(" )
-        
+    
     # Ratio plots
     canv1.SetTitle( "Significance plots" )
     icanv= 0
@@ -168,8 +184,11 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt=
         tge.SetTitle( "Chebychev coeff c"+str(icoeff) )
         imtopPoint= 0
         for key in mlbhistKeys:
-            tokens= key.split("_")
-            mtop= float( tokens[len(tokens)-1] )
+            if "WbWb" in key:
+                mtop= float( key.split("_")[3] ) # Get top mass from file name
+            else:
+                tokens= key.split("_")
+                mtop= float( tokens[len(tokens)-1] )
             fitpars= fitParameters[key]
             fiterrs= fitParErrors[key]
             value= fitpars[icoeff]
@@ -196,7 +215,7 @@ def mtopDependence( mlbhists, n=9, a=40.0, b=160.0, txt="Parametrisation2", opt=
 def parametrisationPlots( opt="" ):
     
     mlbhistKeys= [ "h_mlb_171.0", "h_mlb_172.0", "h_mlb_172.5", "h_mlb_173.0", "h_mlb_174.0" ]
-    mlbhists= getHistosFromFile( mlbhistKeys, "output_signal.root" )
+    mlbhists= getHistosFromFile( mlbhistKeys, ["output_signal.root"] )
     mtopDependence( mlbhists, n=8, a=40.0, b=148.0, txt="ParametrisationRoot_ttbar", opt=opt )
     mtopDependence( mlbhists, n=8, a=40.0, b=160.0, txt="ParametrisationRoot_ttbar", opt=opt )
     mtopDependence( mlbhists, n=9, a=40.0, b=148.0, txt="ParametrisationRoot_ttbar", opt=opt )
@@ -216,9 +235,20 @@ def parametrisationPlots( opt="" ):
     
     return
 
+def parametrisationPlotsWbWb( opt="" ):
+
+    mlbhistKeys= [ "m_bl_fine" ]
+    files = ["WbWb_Slurm_Template_165.0.root", "WbWb_Slurm_Template_167.5.root", "WbWb_Slurm_Template_170.0.root", "WbWb_Slurm_Template_172.5.root", "WbWb_Slurm_Template_175.0.root"]
+    mlbhists= getHistosFromFile( mlbhistKeys, files )
+    mtopDependence( mlbhists, n=8, a=50.0, b=180.0, txt="ParametrisationRoot_WbWb", opt=opt )
+    mtopDependence( mlbhists, n=8, a=50.0, b=300.0, txt="ParametrisationRoot_WbWb", opt=opt )
+    mtopDependence( mlbhists, n=9, a=50.0, b=180.0, txt="ParametrisationRoot_WbWb", opt=opt )
+    mtopDependence( mlbhists, n=9, a=50.0, b=300.0, txt="ParametrisationRoot_WbWb", opt=opt )
+    mtopDependence( mlbhists, n=10, a=50.0, b=180.0, txt="ParametrisationRoot_WbWb", opt=opt )
+    mtopDependence( mlbhists, n=10, a=50.0, b=300.0, txt="ParametrisationRoot_WbWb", opt=opt )
 
 def main():
-    parametrisationPlots( opt="n" )
+    parametrisationPlotsWbWb( opt="n" )
     return
 
 
