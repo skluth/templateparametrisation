@@ -42,20 +42,11 @@ class InputEvaluator {
 public:
   virtual double evaluate( double x ) const = 0;
 };
-// For TH1D objects
-class InputEvaluatorTH1D : public InputEvaluator {
-  TH1D* hist;
+// For TH1 objects
+class InputEvaluatorTH1 : public InputEvaluator {
+  TH1* hist;
 public:
-  InputEvaluatorTH1D( TH1D* h ) : hist(h) {}
-  virtual double evaluate( double x ) const {
-    return hist->Interpolate( x );
-  }
-};
-// For TH1F objects
-class InputEvaluatorTH1F : public InputEvaluator {
-  TH1F* hist;
-public:
-  InputEvaluatorTH1F( TH1F* h ) : hist(h) {}
+  InputEvaluatorTH1( TH1* h ) : hist(h) {}
   virtual double evaluate( double x ) const {
     return hist->Interpolate( x );
   }
@@ -150,14 +141,9 @@ class ChebychevApproximation {
     }
   }
 public:
-  ChebychevApproximation( TH1D* h, double aa, double bb, size_t nn, bool lnorm=false ) :
+  ChebychevApproximation( TH1* h, double aa, double bb, size_t nn, bool lnorm=false ) :
     a(aa), b(bb), n(nn) {
-    ie= std::make_shared<InputEvaluatorTH1D>( h );
-    initialiseCoefficients( lnorm );
-  }
-  ChebychevApproximation( TH1F* h, double aa, double bb, size_t nn, bool lnorm=false ) :
-    a(aa), b(bb), n(nn) {
-    ie= std::make_shared<InputEvaluatorTH1F>( h );
+    ie= std::make_shared<InputEvaluatorTH1>( h );
     initialiseCoefficients( lnorm );
   }
   ChebychevApproximation( const ChebychevApproximation & rhs ) {
